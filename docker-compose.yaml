@@ -1,0 +1,34 @@
+www2:
+  image: nginx
+  expose:
+    - "80"
+  volumes:
+    - ./a/www:/usr/share/nginx/html:ro
+  environment:
+    - VIRTUAL_HOST=admiapp.com,www.admiapp.com
+    - LETSENVRYPT_HOST=sarasa.com,www.sarasa.com
+    - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+
+nginx-proxy:
+  image: jwilder/nginx-proxy
+  ports:
+    - "80:80"
+    - "443:443"
+  volumes:
+    - /var/run/docker.sock:/tmp/docker.sock:ro
+    - ./a/certs:/etc/nginx/certs:ro
+    - /etc/nginx/vhost.d
+    - /usr/share/nginx/html
+  # restart: always
+  # privileged: true
+  labels:
+    - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+letsencrypt:
+  image: jrcs/letsencrypt-nginx-proxy-companion
+  restart: always
+  volumes:
+    - ./a/certs:/etc/nginx/certs:rw
+    - /var/run/docker.sock:/tmp/docker.sock:ro
+  volumes_from:
+    - nginx-proxy:rw
