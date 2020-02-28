@@ -1,34 +1,106 @@
-www2:
-  image: nginx
-  expose:
-    - "80"
-  volumes:
-    - ./a/www:/usr/share/nginx/html:ro
-  environment:
-    - VIRTUAL_HOST=admiapp.com,www.admiapp.com
-    - LETSENVRYPT_HOST=sarasa.com,www.sarasa.com
-    - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+version: '3'
+services:
 
-nginx-proxy:
-  image: jwilder/nginx-proxy
-  ports:
-    - "80:80"
-    - "443:443"
-  volumes:
-    - /var/run/docker.sock:/tmp/docker.sock:ro
-    - ./a/certs:/etc/nginx/certs:ro
-    - /etc/nginx/vhost.d
-    - /usr/share/nginx/html
-  # restart: always
-  # privileged: true
-  labels:
-    - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
 
-letsencrypt:
-  image: jrcs/letsencrypt-nginx-proxy-companion
-  restart: always
-  volumes:
-    - ./a/certs:/etc/nginx/certs:rw
-    - /var/run/docker.sock:/tmp/docker.sock:ro
-  volumes_from:
-    - nginx-proxy:rw
+# nginx-proxy #####################
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./ssl/certs:/etc/nginx/certs:ro
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+    networks:
+      - app-network
+
+# #letsencript
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    volumes:
+      - ./ssl/certs:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-network
+    # volumes_from:
+    #   - nginx-proxy:rw
+
+############## Proyecto AdmiApp ################
+#Nginx Service
+  webserver:
+    image: nginx:alpine
+    container_name: webserver
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80"
+    volumes:
+      - ./alegra1:/var/www
+      - ./alegra1/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - app-network
+      - appa-network
+    environment:
+      - VIRTUAL_HOST=appa.test
+      - LETSENVRYPT_HOST=admiapp.com,www.admiapp.com
+      - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+
+#PHP Service
+  app:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    image: alegra_image
+    container_name: app
+    restart: unless-stopped
+    tty: true
+    environment:
+      VIRTUAL_HOST: appa.test
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
+    working_dir: /var/www
+    volumes:
+      - ./alegra1:/var/www
+      - ./alegra1/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - appa-network
+############## End Proyecto AdmiApp ################
+
+############## proyect b ######################
+# nginx server www #
+  www:
+    image: nginx
+    expose:
+      - "80"
+    volumes:
+      - ./a/www:/usr/share/nginx/html:ro
+    environment:
+      - VIRTUAL_HOST=appb.test
+      - LETSENVRYPT_HOST=appb.test
+      - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+    networks:
+      - app-network
+      - appb-network
+
+
+############## End proyect b ######################
+
+
+#Docker Networks
+networks:
+  app-network:
+    driver: bridge
+  appa-network:
+    driver: bridge
+  appb-network:
+    driver: bridge
+#Volumes
+volumes:
+  dbdata:
+    driver: local
