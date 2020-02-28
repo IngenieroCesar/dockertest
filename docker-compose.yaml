@@ -1,19 +1,17 @@
-version: '3'
+version: '3.7'
+
 services:
-
-
 # nginx-proxy #####################
   nginx-proxy:
-    image: jwilder/nginx-proxy
-    restart: unless-stopped
+    image: jwilder/nginx-proxy:alpine
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./ssl/certs:/etc/nginx/certs:ro
-      - /etc/nginx/vhost.d
-      - /usr/share/nginx/html
+      - ./ssl/vhostd:/etc/nginx/vhost.d
+      - ./ssl/html:/usr/share/nginx/html
     labels:
       - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
     networks:
@@ -23,13 +21,16 @@ services:
   letsencrypt:
     image: jrcs/letsencrypt-nginx-proxy-companion
     restart: always
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
     volumes:
       - ./ssl/certs:/etc/nginx/certs:rw
+      - ./ssl/vhostd:/etc/nginx/vhost.d
+      - ./ssl/html:/usr/share/nginx/html
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - app-network
-    # volumes_from:
-    #   - nginx-proxy:rw
+
 
 ############## Proyecto AdmiApp ################
 #Nginx Service
@@ -41,33 +42,33 @@ services:
     ports:
       - "80"
     volumes:
-      - ./alegra1:/var/www
-      - ./alegra1/nginx/conf.d/:/etc/nginx/conf.d/
+      - ./alegra-proyect:/var/www
+      - ./alegra-proyect/nginx/conf.d/:/etc/nginx/conf.d/
     networks:
       - app-network
       - appa-network
     environment:
-      - VIRTUAL_HOST=appa.test
-      - LETSENVRYPT_HOST=admiapp.com,www.admiapp.com
-      - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+      - VIRTUAL_HOST=admiapp.com,www.admiapp.com
+      - LETSENCRYPT_HOST=admiapp.com,www.admiapp.com
+      - LETSENCRYPT_EMAIL=cesarago852@gmail.com
 
 #PHP Service
   app:
     build:
-      context: ./php
+      context: ./alegra-proyect
       dockerfile: Dockerfile
-    image: alegra_image
+    image: admiapp
     container_name: app
     restart: unless-stopped
     tty: true
     environment:
-      VIRTUAL_HOST: appa.test
-      SERVICE_NAME: app
-      SERVICE_TAGS: dev
+      - VIRTUAL_HOST=admiapp.com,www.admiapp.com
+      - SERVICE_NAME=app
+      - SERVICE_TAGS=dev
     working_dir: /var/www
     volumes:
-      - ./alegra1:/var/www
-      - ./alegra1/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./alegra-proyect:/var/www
+      - ./alegra-proyect/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
       - appa-network
 ############## End Proyecto AdmiApp ################
@@ -81,16 +82,21 @@ services:
     volumes:
       - ./a/www:/usr/share/nginx/html:ro
     environment:
-      - VIRTUAL_HOST=appb.test
-      - LETSENVRYPT_HOST=appb.test
-      - LETSENVRYPT_EMAIL=cesarago852@gmail.com
+      - VIRTUAL_HOST=proyectob.admiapp.com,www.proyectob.admiapp.com
+      - LETSENCRYPT_HOST=proyectob.admiapp.com,www.proyectob.admiapp.com
+      - LETSENCRYPT_EMAIL=cesarago852@gmail.com
     networks:
       - app-network
       - appb-network
 
 
 ############## End proyect b ######################
-
+#Volumes
+volumes:
+  nginx_proxy:
+    driver: local
+  letsencript:
+    driver: local
 
 #Docker Networks
 networks:
@@ -100,7 +106,3 @@ networks:
     driver: bridge
   appb-network:
     driver: bridge
-#Volumes
-volumes:
-  dbdata:
-    driver: local
